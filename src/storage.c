@@ -97,6 +97,7 @@ void save_pairing(struct pkt *p)
 {
 	char mac_str[MAC_STR_LEN];
 	char ip_str[INET6_ADDRSTRLEN];
+	char tpa_str[INET6_ADDRSTRLEN];
 	time_t tstamp;
 	uint16_t hash;
 
@@ -113,15 +114,19 @@ void save_pairing(struct pkt *p)
 	}
 
 	ether_ntoa_m(p->l2_addr, mac_str);
-	if (p->ip_len == IP6_LEN)
+	if (p->ip_len == IP6_LEN) {
 		ip6_ntoa(p->ip_addr, ip_str);
-	else
+                strcpy(tpa_str, "-");
+        }
+	else {
 		ip4_ntoa(p->ip_addr, ip_str);
+		ip4_ntoa(p->arp->arp_tpa, tpa_str);
+        }
 
 	output_shm_save(p, mac_str, ip_str);
 	if (!cfg.quiet) {
-		printf("%lu %s %u %s %s %s\n", tstamp, p->ifc->name, p->vlan_tag, 
-			mac_str, ip_str, pkt_origin_str[p->origin]);
+		printf("%lu %s %u %s %s %s %s\n", tstamp, p->ifc->name, p->vlan_tag, 
+			mac_str, ip_str, pkt_origin_str[p->origin], tpa_str);
 		fflush(stdout);
 	}
 
