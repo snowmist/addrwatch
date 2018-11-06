@@ -95,8 +95,12 @@ static inline uint16_t pkt_hash(uint8_t *l2_addr, uint8_t *ip_addr, uint8_t len,
 
 void save_pairing(struct pkt *p)
 {
-	char mac_str[MAC_STR_LEN];
+	char mac_str_from[MAC_STR_LEN];
+	char mac_str_to[MAC_STR_LEN];
 	char ip_str[INET6_ADDRSTRLEN];
+	char sha_str[MAC_STR_LEN];
+	char spa_str[INET6_ADDRSTRLEN];
+	char tha_str[MAC_STR_LEN];
 	char tpa_str[INET6_ADDRSTRLEN];
 	time_t tstamp;
 	uint16_t hash;
@@ -109,33 +113,39 @@ void save_pairing(struct pkt *p)
 	if (cfg.ratelimit) {
 		hash = pkt_hash(p->l2_addr, p->ip_addr, p->ip_len, p->vlan_tag);
 		hash = hash % cfg.hashsize;
-		if(cache_lookup(p->l2_addr, p->ip_addr, p->ip_len, tstamp, p->vlan_tag, p->ifc->cache + hash))
+		if (cache_lookup(p->l2_addr, p->ip_addr, p->ip_len, tstamp, p->vlan_tag, p->ifc->cache + hash))
 			return;
 	}
 
-	ether_ntoa_m(p->l2_addr, mac_str);
+	ether_ntoa_m(p->l2_addr, mac_str_from);
+	ether_ntoa_m(p->ether->ether_dhost, mac_str_to);
+
+	ether_ntoa_m(p->arp->arp_sha, sha_str);
+	ether_ntoa_m(p->arp->arp_tha, tha_str);
+
 	if (p->ip_len == IP6_LEN) {
 		ip6_ntoa(p->ip_addr, ip_str);
-                strcpy(tpa_str, "-");
-        }
-	else {
+		strcpy(tpa_str, "-");
+	} else {
 		ip4_ntoa(p->ip_addr, ip_str);
 		ip4_ntoa(p->arp->arp_tpa, tpa_str);
-        }
+		ip4_ntoa(p->arp->arp_spa, spa_str);
+	}
 
-	output_shm_save(p, mac_str, ip_str);
+	output_shm_save(p, mac_str_from, ip_str);
 	if (!cfg.quiet) {
-		printf("%lu %s %u %s %s %s %s\n", tstamp, p->ifc->name, p->vlan_tag, 
-			mac_str, ip_str, pkt_origin_str[p->origin], tpa_str);
+		printf("%lu %s %u %s %s %s %s %s %s %s %s\n", tstamp, p->ifc->name, p->vlan_tag,
+		       mac_str_from, ip_str, mac_str_to,
+		       pkt_origin_str[p->origin], sha_str, spa_str, tha_str, tpa_str);
 		fflush(stdout);
 	}
 
 	if (cfg.data_fd)
-		output_flatfile_save(p, mac_str, ip_str);
+		output_flatfile_save(p, mac_str_from, ip_str);
 
 #if HAVE_LIBSQLITE3
 	if (cfg.sqlite_file)
-		output_sqlite_save(p, mac_str, ip_str);
+		output_sqlite_save(p, mac_str_from, ip_str);
 #endif
 
 	if (cfg.ratelimit)
